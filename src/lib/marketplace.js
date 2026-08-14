@@ -15,6 +15,26 @@ const abi = [
 
 const ethers = () => import("ethers");
 
+const isAmoyDeployment = Boolean(process.env.NEXT_PUBLIC_MARKETPLACE_ADDRESS);
+
+export const NETWORK = isAmoyDeployment
+  ? {
+      chainId: "0x13882",
+      chainIdDecimal: 80002,
+      name: "Polygon Amoy",
+      currency: "POL",
+      rpcUrl: process.env.NEXT_PUBLIC_AMOY_RPC_URL || "https://rpc-amoy.polygon.technology",
+      explorerUrl: "https://amoy.polygonscan.com",
+    }
+  : {
+      chainId: "0x7a69",
+      chainIdDecimal: 31337,
+      name: "Hardhat local",
+      currency: "ETH",
+      rpcUrl: "http://127.0.0.1:8545",
+      explorerUrl: "",
+    };
+
 function ethereumProvider() {
   try {
     return window.ethereum || null;
@@ -35,8 +55,27 @@ export async function connectWallet() {
   const provider = ethereumProvider();
   if (!provider) throw new Error("MetaMask is unavailable. Unlock or reload the MetaMask extension, then try again.");
   const accounts = await provider.request({ method: "eth_requestAccounts" });
-  if (await provider.request({ method: "eth_chainId" }) !== "0x7a69") {
-    throw new Error("Switch MetaMask to Hardhat Local (chain ID 31337).");
+  if (await provider.request({ method: "eth_chainId" }) !== NETWORK.chainId) {
+    try {
+      await provider.request({
+        method: "wallet_switchEthereumChain",
+        params: [{ chainId: NETWORK.chainId }],
+      });
+    } catch (error) {
+      if (error?.code !== 4902 || !isAmoyDeployment) {
+        throw new Error(`Switch MetaMask to ${NETWORK.name} (chain ID ${NETWORK.chainIdDecimal}).`);
+      }
+      await provider.request({
+        method: "wallet_addEthereumChain",
+        params: [{
+          chainId: NETWORK.chainId,
+          chainName: NETWORK.name,
+          nativeCurrency: { name: NETWORK.currency, symbol: NETWORK.currency, decimals: 18 },
+          rpcUrls: [NETWORK.rpcUrl],
+          blockExplorerUrls: [NETWORK.explorerUrl],
+        }],
+      });
+    }
   }
   return accounts[0] || "";
 }
@@ -55,7 +94,7 @@ async function hydrateItems(contract, items) {
 
 export async function fetchListings() {
   const { Contract, JsonRpcProvider } = await ethers();
-  const contract = new Contract(CONTRACT_ADDRESS, abi, new JsonRpcProvider("http://127.0.0.1:8545"));
+  const contract = new Contract(CONTRACT_ADDRESS, abi, new JsonRpcProvider(NETWORK.rpcUrl));
   return hydrateItems(contract, await contract.fetchMarketItems());
 }
 
@@ -64,6 +103,10 @@ async function signerContract() {
   if (!injectedProvider) throw new Error("MetaMask is unavailable. Unlock or reload the extension, then try again.");
   const { BrowserProvider, Contract } = await ethers();
   const provider = new BrowserProvider(injectedProvider);
+  const network = await provider.getNetwork();
+  if (Number(network.chainId) !== NETWORK.chainIdDecimal) {
+    throw new Error(`Switch MetaMask to ${NETWORK.name} (chain ID ${NETWORK.chainIdDecimal}).`);
+  }
   return new Contract(CONTRACT_ADDRESS, abi, await provider.getSigner());
 }
 

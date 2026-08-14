@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Deploy Artefact on Polygon Amoy</title>
+    <style>
+      :root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+      * { box-sizing: border-box; }
+      body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #11100f; color: #f7f2ea; }
+      main { width: min(760px, calc(100% - 32px)); padding: 44px; border: 1px solid #514a42; border-radius: 24px; background: #1a1816; box-shadow: 0 24px 70px #0008; }
+      .eyebrow { margin: 0 0 12px; color: #e8b76d; font-size: 12px; font-weight: 800; letter-spacing: .18em; }
+      h1 { margin: 0; font-family: Georgia, serif; font-size: clamp(36px, 7vw, 62px); line-height: .98; }
+      .lede { max-width: 620px; margin: 20px 0 28px; color: #c6beb5; line-height: 1.65; }
+      .panel { margin: 24px 0; padding: 18px 20px; border: 1px solid #3d3833; border-radius: 16px; background: #12110f; }
+      .panel strong { display: block; margin-bottom: 8px; }
+      .panel span, code { color: #d8c9b8; overflow-wrap: anywhere; }
+      button { width: 100%; border: 0; border-radius: 999px; padding: 15px 22px; background: #e8b76d; color: #1a130b; font: inherit; font-weight: 800; cursor: pointer; }
+      button:hover { background: #f2c985; }
+      button:disabled { cursor: wait; opacity: .55; }
+      .success { border-color: #39765c; color: #9ce1be; }
+      .error { border-color: #8f4d45; color: #ffb5aa; }
+      a { color: #e8b76d; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <p class="eyebrow">POLYGON AMOY · CHAIN 80002</p>
+      <h1>Deploy Artefact.</h1>
+      <p class="lede">This testnet-only helper deploys the repository’s compiled NFTMarketplace contract through your connected MetaMask wallet. It never requests or stores a private key.</p>
+      <div class="panel" id="status">
+        <strong>Ready to connect</strong>
+        <span>Use a wallet with a small Polygon Amoy POL balance for gas.</span>
+      </div>
+      <button id="deploy" type="button">Connect MetaMask and deploy</button>
+      <div class="panel" id="result" hidden></div>
+    </main>
+    <script type="module">
+      import { BrowserProvider, ContractFactory } from "https://cdn.jsdelivr.net/npm/ethers@6.17.0/+esm";
+
+      const AMOY = {
+        chainId: "0x13882",
+        chainName: "Polygon Amoy",
+        nativeCurrency: { name: "POL", symbol: "POL", decimals: 18 },
+        rpcUrls: ["https://rpc-amoy.polygon.technology"],
+        blockExplorerUrls: ["https://amoy.polygonscan.com"],
+      };
+
+      const button = document.querySelector("#deploy");
+      const status = document.querySelector("#status");
+      const result = document.querySelector("#result");
+
+      function showStatus(title, message, type = "") {
+        status.className = `panel ${type}`;
+        status.innerHTML = `<strong>${title}</strong><span>${message}</span>`;
+      }
+
+      button.addEventListener("click", async () => {
+        button.disabled = true;
+        result.hidden = true;
+        try {
+          if (!window.ethereum) throw new Error("MetaMask was not detected in this browser.");
+          await window.ethereum.request({ method: "eth_requestAccounts" });
+          const chainId = await window.ethereum.request({ method: "eth_chainId" });
+          if (chainId !== AMOY.chainId) {
+            try {
+              await window.ethereum.request({ method: "wallet_switchEthereumChain", params: [{ chainId: AMOY.chainId }] });
+            } catch (error) {
+              if (error.code !== 4902) throw error;
+              await window.ethereum.request({ method: "wallet_addEthereumChain", params: [AMOY] });
+            }
+          }
+
+          showStatus("Confirm deployment in MetaMask", "The transaction deploys one NFTMarketplace contract on Polygon Amoy.");
+          const artifact = await fetch("/NFTMarketplace.json").then((response) => {
+            if (!response.ok) throw new Error("The compiled contract artifact could not be loaded.");
+            return response.json();
+          });
+          const provider = new BrowserProvider(window.ethereum);
+          const factory = new ContractFactory(artifact.abi, artifact.bytecode, await provider.getSigner());
+          const contract = await factory.deploy();
+          await contract.waitForDeployment();
+          const address = await contract.getAddress();
+          const transaction = contract.deploymentTransaction();
+          showStatus("Deployment confirmed", "Copy the contract address below into Vercel as NEXT_PUBLIC_MARKETPLACE_ADDRESS.", "success");
+          result.className = "panel success";
+          result.hidden = false;
+          result.innerHTML = `<strong>Contract address</strong><code>${address}</code><p><a href="https://amoy.polygonscan.com/address/${address}" target="_blank" rel="noreferrer">View contract on Amoy PolygonScan</a></p><p><a href="https://amoy.polygonscan.com/tx/${transaction.hash}" target="_blank" rel="noreferrer">View deployment transaction</a></p>`;
+          button.textContent = "Deployment complete";
+        } catch (error) {
+          showStatus("Deployment not completed", error.shortMessage || error.message || "The transaction was not completed.", "error");
+          button.disabled = false;
+        }
+      });
+    </script>
+  </body>
+</html>
