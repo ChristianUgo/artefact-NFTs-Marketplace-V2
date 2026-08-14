@@ -1,5 +1,8 @@
 "use client";
 
+/* User-selected local data URLs cannot use the Next.js image optimizer. */
+/* eslint-disable @next/next/no-img-element */
+
 import { useEffect, useMemo, useState } from "react";
 import { connectWallet, createListing, currentAccount, fetchListings, fetchOwnedNFTs, purchaseListing, shortAddress } from "@/lib/marketplace";
 
@@ -43,19 +46,37 @@ export default function Home() {
   };
 
   useEffect(() => {
-    currentAccount().then(setAccount).catch(() => {});
-    load();
+    let cancelled = false;
+    currentAccount()
+      .then((address) => {
+        if (!cancelled) {
+          setPortfolioLoading(Boolean(address));
+          setAccount(address);
+        }
+      })
+      .catch(() => {});
+    fetchListings()
+      .then((listings) => { if (!cancelled) setItems(listings); })
+      .catch(() => { if (!cancelled) setItems([]); })
+      .finally(() => { if (!cancelled) setLoading(false); });
 
-    if (!window.ethereum) return;
-    const updateAccount = (accounts) => setAccount(accounts[0] || "");
-    window.ethereum.on("accountsChanged", updateAccount);
-    return () => window.ethereum.removeListener("accountsChanged", updateAccount);
+    const updateAccount = window.ethereum
+      ? (accounts) => {
+          const address = accounts[0] || "";
+          setPortfolioLoading(Boolean(address));
+          setAccount(address);
+        }
+      : null;
+    if (updateAccount) window.ethereum.on("accountsChanged", updateAccount);
+    return () => {
+      cancelled = true;
+      if (updateAccount) window.ethereum.removeListener("accountsChanged", updateAccount);
+    };
   }, []);
 
   useEffect(() => {
-    if (!account) { setOwnedItems([]); return; }
+    if (!account) return;
     let cancelled = false;
-    setPortfolioLoading(true);
     fetchOwnedNFTs()
       .then((owned) => { if (!cancelled) setOwnedItems(owned); })
       .catch(() => { if (!cancelled) setOwnedItems([]); })
@@ -66,7 +87,7 @@ export default function Home() {
   const results = useMemo(() => items.filter((item) => item.name.toLowerCase().includes(search.toLowerCase())), [items, search]);
 
   async function wallet() {
-    try { const address = await connectWallet(); setAccount(address); setNotice({ type: "success", text: `Wallet ${shortAddress(address)} connected.` }); }
+    try { const address = await connectWallet(); setPortfolioLoading(true); setAccount(address); setNotice({ type: "success", text: `Wallet ${shortAddress(address)} connected.` }); }
     catch (error) { setNotice({ type: "error", text: error.message }); }
   }
 
@@ -126,7 +147,7 @@ export default function Home() {
       <form onSubmit={submit} className="form"><label className={`dropzone ${image ? "filled" : ""}`}>{image ? <img src={image} alt="Selected NFT preview" /> : <><strong>Drop an image here</strong><span>or browse your computer (up to 2 MB)</span></>}<input type="file" accept="image/*" onChange={(event) => chooseImage(event.target.files?.[0])} /></label>{fileName && <p className="file">Ready to mint: {fileName}</p>}<div className="two"><label>Title<input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="A name for the work" /></label><label>Price in ETH<input value={form.price} onChange={(event) => setForm({ ...form, price: event.target.value })} inputMode="decimal" placeholder="1" /></label></div><label>Description<textarea value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} placeholder="What should a collector know?" /></label><button className="primary full" disabled={busy}>{busy ? "Waiting for confirmation..." : "Mint and list NFT"}</button></form>
     </section>}
 
-    {view === "portfolio" && <section className="portfolio"><p className="eyebrow">YOUR WALLET</p><h1>{account ? "NFTs owned by this wallet" : "Connect to see your collection"}</h1>{account && <p className="address">{account}</p>}{portfolioLoading ? <Empty text="Loading owned NFTs from the local chain..." /> : ownedItems.length ? <div className="grid">{ownedItems.map((item) => <Card key={item.tokenId} item={item} choose={setSelected} owned />)}</div> : <Empty text={account ? "This wallet does not own any purchased NFTs yet." : "Connect MetaMask to inspect your local collection."} />}</section>}
+    {view === "portfolio" && <section className="portfolio"><p className="eyebrow">YOUR WALLET</p><h1>{account ? "NFTs owned by this wallet" : "Connect to see your collection"}</h1>{account && <p className="address">{account}</p>}{!account ? <Empty text="Connect MetaMask to inspect your local collection." /> : portfolioLoading ? <Empty text="Loading owned NFTs from the local chain..." /> : ownedItems.length ? <div className="grid">{ownedItems.map((item) => <Card key={item.tokenId} item={item} choose={setSelected} owned />)}</div> : <Empty text="This wallet does not own any purchased NFTs yet." />}</section>}
     {selected && <Dialog item={selected} account={account} close={() => setSelected(null)} buy={buy} busy={busy} />}
   </main>;
 }
