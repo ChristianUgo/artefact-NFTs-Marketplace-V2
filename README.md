@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/ChristianUgo/artefact-NFTs-Marketplace-V2/actions/workflows/ci.yml/badge.svg)](https://github.com/ChristianUgo/artefact-NFTs-Marketplace-V2/actions/workflows/ci.yml)
 
-Artefact is a local-first NFT marketplace that demonstrates an end-to-end ERC-721 sale on a Hardhat network. A creator can mint and list an NFT, a second MetaMask account can purchase it, and the buyer can verify on-chain ownership in Portfolio.
+Artefact is an NFT marketplace that demonstrates an end-to-end ERC-721 sale locally on Hardhat and publicly on Polygon Amoy. A creator can mint and list an NFT, a second MetaMask account can purchase it, and the buyer can verify on-chain ownership in Portfolio.
 
 This repository is intentionally scoped as an auditable portfolio project. It proves the core marketplace lifecycle without presenting local browser storage or a development chain as production infrastructure.
 
@@ -91,6 +91,19 @@ npm run lint
 npm run build
 ```
 
+## Polygon Amoy and Vercel
+
+The public deployment uses two non-secret environment variables:
+
+| Variable | Value |
+| --- | --- |
+| `NEXT_PUBLIC_MARKETPLACE_ADDRESS` | The deployed Polygon Amoy `NFTMarketplace` address |
+| `NEXT_PUBLIC_AMOY_RPC_URL` | A public Polygon Amoy JSON-RPC URL |
+
+To deploy without exposing a private key, run the app and open `/deploy-amoy.html` in the same browser as MetaMask. Confirm the single testnet deployment transaction, then copy the resulting address into Vercel as `NEXT_PUBLIC_MARKETPLACE_ADDRESS`. The helper contains compiled public bytecode only; MetaMask performs all signing.
+
+When `NEXT_PUBLIC_MARKETPLACE_ADDRESS` is absent, the application retains its local Hardhat defaults for development and contract tests.
+
 The contract suite is deliberately concise and tests behavior rather than implementation details:
 
 - minting and marketplace escrow;
@@ -144,6 +157,8 @@ test/NFTMarketplace.js         Focused mint and purchase lifecycle tests
 src/lib/marketplace.js         ethers, MetaMask, metadata, and contract adapter
 src/app/page.js                Marketplace, create, purchase, and Portfolio UI
 src/app/globals.css            Responsive visual system
+public/deploy-amoy.html        MetaMask-based Polygon Amoy deployment helper
+public/NFTMarketplace.json    Compiled public ABI and deployment bytecode
 .github/workflows/ci.yml       Pull-request quality gates
 ```
 
