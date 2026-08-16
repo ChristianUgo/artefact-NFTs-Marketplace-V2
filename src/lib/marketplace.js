@@ -55,29 +55,34 @@ export async function connectWallet() {
   const provider = ethereumProvider();
   if (!provider) throw new Error("MetaMask is unavailable. Unlock or reload the MetaMask extension, then try again.");
   const accounts = await provider.request({ method: "eth_requestAccounts" });
-  if (await provider.request({ method: "eth_chainId" }) !== NETWORK.chainId) {
-    try {
-      await provider.request({
-        method: "wallet_switchEthereumChain",
-        params: [{ chainId: NETWORK.chainId }],
-      });
-    } catch (error) {
-      if (error?.code !== 4902 || !isAmoyDeployment) {
-        throw new Error(`Switch MetaMask to ${NETWORK.name} (chain ID ${NETWORK.chainIdDecimal}).`);
-      }
-      await provider.request({
-        method: "wallet_addEthereumChain",
-        params: [{
-          chainId: NETWORK.chainId,
-          chainName: NETWORK.name,
-          nativeCurrency: { name: NETWORK.currency, symbol: NETWORK.currency, decimals: 18 },
-          rpcUrls: [NETWORK.rpcUrl],
-          blockExplorerUrls: [NETWORK.explorerUrl],
-        }],
-      });
-    }
-  }
+  await ensureNetwork(provider);
   return accounts[0] || "";
+}
+
+async function ensureNetwork(provider) {
+  if (await provider.request({ method: "eth_chainId" }) === NETWORK.chainId) return;
+
+  try {
+    await provider.request({
+      method: "wallet_switchEthereumChain",
+      params: [{ chainId: NETWORK.chainId }],
+    });
+  } catch (error) {
+    if (error?.code !== 4902 || !isAmoyDeployment) {
+      throw new Error(`Switch MetaMask to ${NETWORK.name} (chain ID ${NETWORK.chainIdDecimal}).`);
+    }
+
+    await provider.request({
+      method: "wallet_addEthereumChain",
+      params: [{
+        chainId: NETWORK.chainId,
+        chainName: NETWORK.name,
+        nativeCurrency: { name: NETWORK.currency, symbol: NETWORK.currency, decimals: 18 },
+        rpcUrls: [NETWORK.rpcUrl],
+        blockExplorerUrls: [NETWORK.explorerUrl],
+      }],
+    });
+  }
 }
 
 async function hydrateItems(contract, items) {
@@ -101,12 +106,9 @@ export async function fetchListings() {
 async function signerContract() {
   const injectedProvider = ethereumProvider();
   if (!injectedProvider) throw new Error("MetaMask is unavailable. Unlock or reload the extension, then try again.");
+  await ensureNetwork(injectedProvider);
   const { BrowserProvider, Contract } = await ethers();
   const provider = new BrowserProvider(injectedProvider);
-  const network = await provider.getNetwork();
-  if (Number(network.chainId) !== NETWORK.chainIdDecimal) {
-    throw new Error(`Switch MetaMask to ${NETWORK.name} (chain ID ${NETWORK.chainIdDecimal}).`);
-  }
   return new Contract(CONTRACT_ADDRESS, abi, await provider.getSigner());
 }
 

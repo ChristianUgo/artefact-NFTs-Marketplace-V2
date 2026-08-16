@@ -3,9 +3,9 @@ pragma solidity ^0.8.4;
 
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
-import "hardhat/console.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
-contract NFTMarketplace is ERC721URIStorage {
+contract NFTMarketplace is ERC721URIStorage, ReentrancyGuard {
     using Counters for Counters.Counter;
 
     Counters.Counter private _tokenIds;
@@ -68,6 +68,7 @@ contract NFTMarketplace is ERC721URIStorage {
 
     function resellToken(uint256 tokenId, uint256 price) public payable {
         require(idToMarketItem[tokenId].owner == msg.sender, "Only item owner can perform this operation");
+        require(price > 0, "Price must be at least 1 wei");
         require(msg.value == listingPrice, "Price must be equal to listing price");
 
         idToMarketItem[tokenId].sold = false;
@@ -78,18 +79,24 @@ contract NFTMarketplace is ERC721URIStorage {
         _transfer(msg.sender, address(this), tokenId);
     }
 
-    function createMarketSale(uint256 tokenId) public payable {
-        uint256 price = idToMarketItem[tokenId].price;
-        address seller = idToMarketItem[tokenId].seller;
+    function createMarketSale(uint256 tokenId) public payable nonReentrant {
+        MarketItem storage item = idToMarketItem[tokenId];
+        uint256 price = item.price;
+        address payable seller = item.seller;
+        require(item.owner == address(this) && !item.sold, "Item is not listed for sale");
+        require(msg.sender != seller, "Seller cannot buy their own listing");
         require(msg.value == price, "Please submit the asking price in order to complete the purchase");
 
-        idToMarketItem[tokenId].owner = payable(msg.sender);
-        idToMarketItem[tokenId].sold = true;
-        idToMarketItem[tokenId].seller = payable(address(0));
+        item.owner = payable(msg.sender);
+        item.sold = true;
+        item.seller = payable(address(0));
         _itemsSold.increment();
         _transfer(address(this), msg.sender, tokenId);
-        payable(owner).transfer(listingPrice);
-        payable(seller).transfer(msg.value);
+
+        (bool feePaid, ) = owner.call{value: listingPrice}("");
+        require(feePaid, "Listing fee payment failed");
+        (bool sellerPaid, ) = seller.call{value: msg.value}("");
+        require(sellerPaid, "Seller payment failed");
     }
 
     function fetchMarketItems() public view returns (MarketItem[] memory) {
