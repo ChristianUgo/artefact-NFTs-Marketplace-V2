@@ -8,9 +8,11 @@
     "start": "next start",
     "lint": "eslint src --max-warnings=0",
     "compile": "hardhat compile",
-    "test:contracts": "hardhat test",
+    "export:artifact": "hardhat compile && node scripts/export-artifact.js",
+    "test:contracts": "hardhat compile && mocha test/NFTMarketplace.js --timeout 40000",
     "node": "hardhat node",
-    "deploy:local": "hardhat run scripts/deploy.js --network localhost"
+    "deploy:local": "hardhat run scripts/deploy.js --network localhost",
+    "deploy:amoy": "hardhat run scripts/deploy.js --network amoy"
   },
   "dependencies": {
     "@next/swc-wasm-nodejs": "^16.3.0",
@@ -21,11 +23,13 @@
     "react-dom": "19.2.8"
   },
   "devDependencies": {
+    "@next/env": "^16.3.0",
     "@nomicfoundation/hardhat-ethers": "^3.1.3",
     "@tailwindcss/postcss": "^4",
     "eslint": "^9",
     "eslint-config-next": "16.3.0",
     "hardhat": "^2.29.0",
+    "mocha": "^11.8.0",
     "tailwindcss": "^4"
   }
 }

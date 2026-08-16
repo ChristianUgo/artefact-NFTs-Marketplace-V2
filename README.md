@@ -4,11 +4,11 @@
 
 Artefact is an NFT marketplace that demonstrates an end-to-end ERC-721 sale locally on Hardhat and publicly on Polygon Amoy. A creator can mint and list an NFT, a second MetaMask account can purchase it, and the buyer can verify on-chain ownership in Portfolio.
 
-This repository is intentionally scoped as an auditable portfolio project. It proves the core marketplace lifecycle without presenting local browser storage or a development chain as production infrastructure.
+This repository is intentionally scoped as an auditable portfolio project. It proves the core marketplace lifecycle without presenting testnet tokens or browser-local media as production infrastructure.
 
 ## Demonstrated flow
 
-1. Connect MetaMask to Hardhat chain `31337`.
+1. Connect MetaMask to local Hardhat chain `31337` or Polygon Amoy chain `80002`.
 2. Mint an ERC-721 with metadata and pay the marketplace listing fee.
 3. Escrow the token in the marketplace contract.
 4. Switch to a different Hardhat account.
@@ -23,7 +23,7 @@ This repository is intentionally scoped as an auditable portfolio project. It pr
 | Frontend | Next.js 16, React 19 | Marketplace, minting, purchase, and Portfolio views |
 | Wallet integration | MetaMask, ethers 6 | Account access, chain validation, reads, and signed transactions |
 | Smart contract | Solidity 0.8.4, OpenZeppelin ERC721URIStorage | Minting, escrow, listings, sales, ownership, and token metadata |
-| Development chain | Hardhat 2 | Deterministic local accounts, deployment, and contract testing |
+| Networks | Hardhat 2, Polygon Amoy | Deterministic local testing and public testnet deployment |
 | Styling | CSS, Tailwind PostCSS pipeline | Responsive application interface |
 | Quality gates | Mocha, Node strict assertions, GitHub Actions | Contract lifecycle tests and production-build verification |
 
@@ -35,8 +35,8 @@ flowchart LR
     U --> UI["Next.js client"]
     UI --> E["ethers integration"]
     E --> M
-    M --> H["Hardhat JSON-RPC"]
-    H --> C["NFTMarketplace contract"]
+    M --> N["Hardhat or Polygon Amoy JSON-RPC"]
+    N --> C["NFTMarketplace contract"]
     UI --> L["Browser localStorage images"]
     C --> S["On-chain ownership and listing state"]
 ```
@@ -91,7 +91,11 @@ npm run lint
 npm run build
 ```
 
+After changing the contract, refresh the public MetaMask deployment artifact with `npm run export:artifact` and commit the generated JSON with the contract change.
+
 ## Polygon Amoy and Vercel
+
+Amoy is the public testnet target. It uses chain ID `80002` and `POL` test tokens. Polygon publishes current [Amoy network details](https://docs.polygon.technology/pos/reference/rpc-endpoints) and [test-token faucet guidance](https://docs.polygon.technology/tools/gas/matic-faucet).
 
 The public deployment uses two non-secret environment variables:
 
@@ -100,7 +104,12 @@ The public deployment uses two non-secret environment variables:
 | `NEXT_PUBLIC_MARKETPLACE_ADDRESS` | The deployed Polygon Amoy `NFTMarketplace` address |
 | `NEXT_PUBLIC_AMOY_RPC_URL` | A public Polygon Amoy JSON-RPC URL |
 
-To deploy without exposing a private key, run the app and open `/deploy-amoy.html` in the same browser as MetaMask. Confirm the single testnet deployment transaction, then copy the resulting address into Vercel as `NEXT_PUBLIC_MARKETPLACE_ADDRESS`. The helper contains compiled public bytecode only; MetaMask performs all signing.
+1. Create a fresh test-only wallet and fund its public address with faucet POL. Never use a production wallet or seed phrase.
+2. Run the app and open `/deploy-amoy.html` in the same browser as MetaMask.
+3. Confirm the single testnet deployment transaction, then verify it on [Amoy Polygonscan](https://amoy.polygonscan.com/).
+4. Copy the resulting address into Vercel as `NEXT_PUBLIC_MARKETPLACE_ADDRESS`, set `NEXT_PUBLIC_AMOY_RPC_URL`, and redeploy.
+
+The helper contains compiled public bytecode only; MetaMask performs all signing. Public `NEXT_PUBLIC_*` values are embedded into the browser bundle at build time.
 
 When `NEXT_PUBLIC_MARKETPLACE_ADDRESS` is absent, the application retains its local Hardhat defaults for development and contract tests.
 
@@ -122,7 +131,7 @@ The contract suite is deliberately concise and tests behavior rather than implem
 | On-chain token URI | Self-contained metadata reference for the demo | `ERC721URIStorage` costs more gas than a base-URI design |
 | Browser-local images | No API key, pinning service, or upload backend is required | Images do not follow the NFT to another browser or computer |
 | Array-returning read methods | Simple frontend integration for a small demonstration | Linear scans do not scale to large collections |
-| Local Hardhat network | Fast, deterministic testing with disposable accounts | Restarting the node clears state and changes deployment context |
+| Local and Amoy configuration | Deterministic local tests plus a publicly verifiable demo | Public RPC endpoints can be rate-limited; production should use a managed endpoint |
 
 ## Gas considerations
 
@@ -140,9 +149,9 @@ No gas-optimization claim is made without benchmarks. Correct ownership and sett
 This contract has not been professionally audited and must not hold real assets.
 
 - The deployment owner is trusted to change the listing fee.
-- Users are expected to interact through the supplied interface on chain `31337`.
-- Payments use Solidity `transfer`, which limits forwarded gas but can reject contract-wallet recipients. A production version should use a pull-payment design or checked `call` with reentrancy protection.
-- The interface prevents a seller from buying their own listing, but production invariants should also be enforced in the contract.
+- Users are expected to interact through the supplied interface on chain `31337` or Amoy chain `80002`.
+- Settlement uses checked `call` operations protected by `ReentrancyGuard`. A production version should still prefer pull payments to reduce receiver-coupling risk.
+- Seller self-purchases and purchases of inactive listings are rejected by the contract, not only by the interface.
 - Contract state is authoritative; browser notices are shown only after transaction confirmation.
 - Uploaded media is untrusted browser input and is limited to image MIME types and 2 MB by the interface.
 
@@ -152,7 +161,8 @@ See [SECURITY.md](SECURITY.md) for disclosure guidance and the complete non-prod
 
 ```text
 contracts/NFTMarketplace.sol   ERC-721 marketplace contract
-scripts/deploy.js              Local deployment and frontend address update
+scripts/deploy.js              Local and Amoy deployment records
+scripts/export-artifact.js     Refreshes the browser deployment bytecode
 test/NFTMarketplace.js         Focused mint and purchase lifecycle tests
 src/lib/marketplace.js         ethers, MetaMask, metadata, and contract adapter
 src/app/page.js                Marketplace, create, purchase, and Portfolio UI
@@ -167,6 +177,5 @@ public/NFTMarketplace.json    Compiled public ABI and deployment bytecode
 - Move images and metadata to IPFS or another durable content-addressed store.
 - Add indexed-event ingestion instead of full-collection scans.
 - Replace push payments with a withdrawal pattern.
-- Add contract-level seller/buyer invariants and reentrancy protection.
 - Upgrade Solidity and OpenZeppelin after a dedicated migration review.
-- Add testnet configuration, deployment verification, gas reporting, and an external audit.
+- Add automated source verification, gas reporting, and an external audit.

@@ -68,4 +68,23 @@ describe("NFTMarketplace", function () {
     assert.ok(purchaseError);
     assert.match(purchaseError.message, /Please submit the asking price in order to complete the purchase/);
   });
+
+  it("rejects a seller buying their own active listing", async function () {
+    await mintAndList();
+
+    await assert.rejects(
+      marketplace.createMarketSale(1, { value: askingPrice }),
+      /Seller cannot buy their own listing/
+    );
+  });
+
+  it("rejects purchasing an item that is no longer listed", async function () {
+    await mintAndList();
+    await marketplace.connect(buyer).createMarketSale(1, { value: askingPrice });
+
+    await assert.rejects(
+      marketplace.createMarketSale(1, { value: askingPrice }),
+      /Item is not listed for sale/
+    );
+  });
 });
