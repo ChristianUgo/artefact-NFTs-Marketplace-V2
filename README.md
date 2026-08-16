@@ -91,6 +91,8 @@ npm run lint
 npm run build
 ```
 
+After changing the contract, refresh the public MetaMask deployment artifact with `npm run export:artifact` and commit the generated JSON with the contract change.
+
 ## Polygon Amoy and Vercel
 
 Amoy is the public testnet target. It uses chain ID `80002` and `POL` test tokens. Polygon publishes current [Amoy network details](https://docs.polygon.technology/pos/reference/rpc-endpoints) and [test-token faucet guidance](https://docs.polygon.technology/tools/gas/matic-faucet).
@@ -160,6 +162,7 @@ See [SECURITY.md](SECURITY.md) for disclosure guidance and the complete non-prod
 ```text
 contracts/NFTMarketplace.sol   ERC-721 marketplace contract
 scripts/deploy.js              Local and Amoy deployment records
+scripts/export-artifact.js     Refreshes the browser deployment bytecode
 test/NFTMarketplace.js         Focused mint and purchase lifecycle tests
 src/lib/marketplace.js         ethers, MetaMask, metadata, and contract adapter
 src/app/page.js                Marketplace, create, purchase, and Portfolio UI

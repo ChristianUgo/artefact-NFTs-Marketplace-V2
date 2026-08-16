@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint src --max-warnings=0",
     "compile": "hardhat compile",
+    "export:artifact": "hardhat compile && node scripts/export-artifact.js",
     "test:contracts": "hardhat compile && mocha test/NFTMarketplace.js --timeout 40000",
     "node": "hardhat node",
     "deploy:local": "hardhat run scripts/deploy.js --network localhost",

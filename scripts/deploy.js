@@ -33,7 +33,7 @@ async function main() {
   console.log(`NFTMarketplace deployed to ${address} on ${hre.network.name}`);
   console.log(`Deployment record written to ${deploymentFile}`);
   if (hre.network.name === "amoy") {
-    console.log(`Set NEXT_PUBLIC_CONTRACT_ADDRESS=${address} in Vercel before rebuilding the frontend.`);
+    console.log(`Set NEXT_PUBLIC_MARKETPLACE_ADDRESS=${address} in Vercel before rebuilding the frontend.`);
   }
 }
 
