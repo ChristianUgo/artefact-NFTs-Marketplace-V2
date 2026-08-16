@@ -1,4 +1,7 @@
 require("@nomicfoundation/hardhat-ethers");
+const { loadEnvConfig } = require("@next/env");
+
+loadEnvConfig(__dirname);
 
 const amoyRpcUrl = process.env.AMOY_RPC_URL || "https://polygon-amoy.drpc.org";
 const deployerPrivateKey = process.env.DEPLOYER_PRIVATE_KEY;
