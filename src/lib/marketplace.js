@@ -15,7 +15,9 @@ const abi = [
 
 const ethers = () => import("ethers");
 
-const isAmoyDeployment = Boolean(process.env.NEXT_PUBLIC_MARKETPLACE_ADDRESS);
+const isAmoyDeployment =
+  CONTRACT_ADDRESS.toLowerCase() !==
+  "0x5FbDB2315678afecb367f032d93F642f64180aa3".toLowerCase();
 
 export const NETWORK = isAmoyDeployment
   ? {
